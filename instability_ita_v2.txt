@@ -1,0 +1,34 @@
+Nb of nominal anaphora tot.:       Unnamed: 0  Unnamed: 0.1  ...            Source  max_tag_occurrences
+0              0             0  ...   NORM_CE1_11.csv                   10
+1              1             1  ...   NORM_CE1_11.csv                   10
+3              3             3  ...   NORM_CE1_11.csv                   10
+8              8             8  ...   NORM_CE1_11.csv                   10
+9              9             9  ...   NORM_CE1_11.csv                   10
+...          ...           ...  ...               ...                  ...
+4554        4820             8  ...  NORM_CE2_870.csv                    9
+4555        4821             9  ...  NORM_CE2_870.csv                    7
+4556        4822            10  ...  NORM_CE2_870.csv                    7
+4557        4823            11  ...  NORM_CE2_870.csv                    7
+4561        4827            15  ...  NORM_CE2_870.csv                    7
+
+[1777 rows x 20 columns]
+Nb of nominal anaphora no Indef tot.:       Unnamed: 0  Unnamed: 0.1  ...            Source  max_tag_occurrences
+0              0             0  ...   NORM_CE1_11.csv                   10
+3              3             3  ...   NORM_CE1_11.csv                   10
+8              8             8  ...   NORM_CE1_11.csv                   10
+9              9             9  ...   NORM_CE1_11.csv                   10
+16            16            16  ...   NORM_CE1_11.csv                   10
+...          ...           ...  ...               ...                  ...
+4554        4820             8  ...  NORM_CE2_870.csv                    9
+4555        4821             9  ...  NORM_CE2_870.csv                    7
+4556        4822            10  ...  NORM_CE2_870.csv                    7
+4557        4823            11  ...  NORM_CE2_870.csv                    7
+4561        4827            15  ...  NORM_CE2_870.csv                    7
+
+[1420 rows x 20 columns]
+Stability CE1 : 2.015833333333334
+Stability CE2 : 2.3784013605442174
+Stability CE1-CE2 : 2.208778891673629
+Instability CE1 : 66.33680025040319
+Instability CE2 : 60.47639936376202
+Instability CE1-CE2 : 63.21810738090409

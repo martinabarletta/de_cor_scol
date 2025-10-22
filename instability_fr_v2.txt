@@ -1,0 +1,34 @@
+Nb of nominal anaphora tot.:       Unnamed: 0  ...  max_tag_occurrences
+0              0  ...                    6
+2              2  ...                    6
+4              4  ...                    6
+5              5  ...                    6
+6              6  ...                    5
+...          ...  ...                  ...
+2894        3126  ...                    9
+2895        3127  ...                    9
+2897        3129  ...                    9
+2903        3135  ...                    3
+2905        3137  ...                    3
+
+[1220 rows x 20 columns]
+Nb of nominal anaphora no Indef tot.:       Unnamed: 0  ...  max_tag_occurrences
+2              2  ...                    6
+4              4  ...                    6
+5              5  ...                    6
+8              8  ...                    5
+10            10  ...                    5
+...          ...  ...                  ...
+2889        3121  ...                    6
+2894        3126  ...                    9
+2895        3127  ...                    9
+2897        3129  ...                    9
+2905        3137  ...                    3
+
+[1026 rows x 20 columns]
+Stability CE1 : 1.891046831955923
+Stability CE2 : 2.2924074074074072
+Stability CE1-CE2 : 2.1310631229235883
+Instability CE1 : 70.89334907516727
+Instability CE2 : 61.404010341510336
+Instability CE1-CE2 : 65.21866146035583
