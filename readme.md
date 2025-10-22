@@ -1,6 +1,7 @@
 Liste et documentation des codes pour le travail de thèse de Martina :dizzy:
+
 -- interdistance
-- densité référentielle
+-- densité référentielle
 -- density : 
 calcul de la densité référentielle
 prends en input le fichier csv contenant chaque mention et ses caracteristiques
