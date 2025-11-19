@@ -12,12 +12,21 @@ text | character/s | SNdef | SNindef | PRON | PROPN ....
 
 use manually wrangled data as an input
 v1
-C:/Users/matil/Documents/decorscol/stats_TALN_2025/typologie_mentions_fr_V4.xlsx
-C:/Users/matil/Documents/decorscol/stats_TALN_2025/ita_types_v2.xlsx
+./typologie_mentions_fr_V4.xlsx
+./ita_types_v2.xlsx
 """
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from pathlib import Path
+
+
+# Get this script's folder (codes/)
+script_dir = Path(__file__).parent
+
+# Go up one level to project/
+project_dir = script_dir.parent
+data_dir = project_dir / "sheets/francais"
 
 def load_and_process_excel(file_path):
     # Load all sheets
@@ -49,7 +58,7 @@ def calculate_sheetname_percentages(df):
     merged = pd.merge(counts, group_counts, on=['Source', 'tag'])
     merged['Percentage'] = (merged['Count'] / merged['Total']) * 100
 
-    # Pivot to get desired format
+    # Pivot
     pivot_df = merged.pivot_table(index=['Source', 'tag'],
                                   columns='SheetName',
                                   values='Percentage',
@@ -65,21 +74,21 @@ def plot_sheetname_distribution(pivot_df):
     # Create a combined key for plotting
     melted['Source_tag'] = melted['Source'].astype(str) + ' / ' + melted['tag'].astype(str)
 
-# === Run the complete process ===
-file_path = './typologie_mentions_fr_V4.xlsx'  # Replace this with your actual Excel file path
+# Run the complete process 
+file_path = data_dir/'typologie_mentions_fr_V4.xlsx'  # Replace this with your actual Excel file path
 
 # Load, process, compute, and visualize
 combined_df = load_and_process_excel(file_path)
 pivot_df = calculate_sheetname_percentages(combined_df)
 
-# 🔹 Aggiungi qui il calcolo del massimo tag_occurrences per ogni Source/Tag
+# Aggiungi qui il calcolo del massimo tag_occurrences per ogni Source/Tag
 max_tag_occurrences = (
     combined_df.groupby(['Source', 'tag'])['tag_occurrences']
     .max()
     .reset_index(name='Max_Tag_Occurrences')
 )
 
-# 🔹 Unisci al pivot_df
+# Unisci al pivot_df
 pivot_df = pd.merge(pivot_df, max_tag_occurrences, on=['Source', 'tag'], how='left')
 
 plot_sheetname_distribution(pivot_df)
@@ -88,9 +97,6 @@ plot_sheetname_distribution(pivot_df)
 print(pivot_df)
 pivot_df = pivot_df[~pivot_df['Max_Tag_Occurrences'].isin([1, 2])]
 
-# # Seleziona solo i campi necessari
-# dist_df = pivot_df[['Source', 'tag', 'Max_Tag_Occurrences']].copy()
-# dist_df['Source_Tag'] = dist_df['Source'].astype(str) + ' / ' + dist_df['tag'].astype(str)
 
 print(list(pivot_df.columns))
 
@@ -99,7 +105,6 @@ print(list(pivot_df.columns))
 group_columns = ['autre', 'det_poss', 'numerals', 'pron', 
                  'propn', 'sn_def', 'sn_dem', 'sn_indef', 
                  'sn_no_det', 'sn_poss', 'verb']
-
 
 
 ####creare i profili di ogni catena 
@@ -125,23 +130,19 @@ sheetname_ordered = (
 pivot_df2 = pd.merge(max_occurrences, sheetname_ordered, on=['Source', 'tag'])
 
 
-# 1. Espandi i valori Ordered_SheetNames su colonne separate
+#espande i valori Ordered_SheetNames su colonne separate
 sheetname_expanded = pd.DataFrame(
     pivot_df2['OrderedSheetNames'].to_list(),
     columns=[f'Sheet_{i+1}' for i in range(pivot_df2['OrderedSheetNames'].apply(len).max())]
 )
 
-
-
-# 2. Combina con le altre colonne (Source, Tag, Max_Tag_Occurrences)
+#combina con le altre colonne (Source, Tag, Max_Tag_Occurrences)
 export_df = pd.concat(
     [pivot_df2[['Source', 'tag', 'Max_Tag_Occurrences']], sheetname_expanded],
     axis=1
 )
 
-
-# 3. Esporta su Excel
-export_df.to_excel("./chains_profiles_fr.xlsx", index=False)
+export_df.to_excel(data_dir/"chains_profiles_fr.xlsx", index=False)
 
 # Seleziona le prime 5 colonne Sheet_*
 sheet_columns = [col for col in export_df.columns if col.startswith('Sheet_')][0:3]
@@ -161,9 +162,9 @@ combo_counts['Combo'] = combo_counts[sheet_columns].astype(str).agg(' - '.join, 
 # Plot
 plt.figure(figsize=(12, 6))
 sns.barplot(data=combo_counts.head(10), x='Frequency', y='Combo', palette='pastel')
-plt.title('Top 10 combinazioni di Sheet più frequenti')
-plt.xlabel('Frequenza')
-plt.ylabel('Sequenza Sheet')
+plt.title('')
+plt.xlabel('Fréquence')
+plt.ylabel('Séquence de mentions')
 plt.tight_layout()
 plt.show()
 

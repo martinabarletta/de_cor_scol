@@ -55,7 +55,7 @@ for i, row in stats.iterrows():
     plt.text(i, row['min'], f"Min = {row['min']:.1f}", 
              ha='center', va='bottom', color='black', fontweight='bold')
 
-plt.title("Distribution du nombre de référents par niveau scolaire - corpus français")
+plt.title("Distribution du nombre de référents par niveau scolaire - corpus italien")
 plt.xlabel("Niveau scolaire")
 plt.ylabel("Nombre de référents par texte")
 plt.tight_layout()
@@ -82,6 +82,8 @@ for p in ax.patches:
             ha='center', va='bottom',
             fontsize=9, fontweight='bold'
         )
+
+ax.set_ylim(0, 37)
 
 
 plt.title("Nombre de textes selon le nombre de référents et le niveau scolaire - corpus italien")

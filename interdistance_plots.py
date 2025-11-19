@@ -40,8 +40,6 @@ result['Interdistance_ratio'] = result["interdistance"] / result['tag_occurrence
 
 result.to_csv(project_dir/'annotations_francais/interdistance_fr.csv', index=False)
 
-
-
 ########################""INTERDISTANCE PUR###################################
 #calcul min, max, moyenne tot puis par niveau
 # 1. Min and max for each numeric column
