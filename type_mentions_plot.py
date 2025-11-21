@@ -30,6 +30,21 @@ sheet_groups = {
     "autre" : 'Autre'
 }
 
+def add_school_level(df):
+    df = df.copy()
+
+    # Convert to string to avoid errors
+    if "Source" in df.columns:
+        df["Source"] = df["Source"].astype(str)
+
+        df["School_Level"] = df["Source"].apply(
+            lambda x: "CE1" if "CE1" in x else ("CE2" if "CE2" in x else "Unknown")
+        )
+    else:
+        df["School_Level"] = "Unknown"
+
+    return df
+
 
 def calculate_ERType(file_path, sheet_groups) :
     xls = pd.ExcelFile(file_path)
@@ -184,8 +199,17 @@ file_path_fr = project_dir/"sheets/francais/typologie_mentions_fr_V4.xlsx"
 file_path_it = project_dir/"sheets/italien/ita_types_v2.xlsx"
 
 #toutes mentions
+# Load and classify sheets
 french, fr_dfs = calculate_ERType(file_path_fr, sheet_groups)
 italian, it_dfs = calculate_ERType(file_path_it, sheet_groups)
+
+# Add school level to all French and Italian dataframes
+for key in fr_dfs:
+    fr_dfs[key] = add_school_level(fr_dfs[key])
+
+for key in it_dfs:
+    it_dfs[key] = add_school_level(it_dfs[key])
+
 
 #####filter out singletons and anaphoras##############################################################################
 filtered_df_fr = pd.read_csv(project_dir/"sheets/francais/anaphores_fr.csv") #<- fatto con interdistance_table
@@ -194,8 +218,25 @@ filtered_df_it = pd.read_csv(project_dir/"sheets/italien/anaphores_it.csv") #<- 
 filtered_fr, dropped_fr = filter_anaphoras(fr_dfs, filtered_df_fr)
 filtered_ita, dropped_ita = filter_anaphoras(it_dfs, filtered_df_it)
 
+# Add school level AFTER filtering
+for key in filtered_fr:
+    filtered_fr[key] = add_school_level(filtered_fr[key])
+for key in filtered_ita:
+    filtered_ita[key] = add_school_level(filtered_ita[key])
+
+dropped_fr = add_school_level(dropped_fr)
+dropped_ita = add_school_level(dropped_ita)
+
+
 anaphoras_fr, singletons_fr = separate_anaphoras_and_singletons(dropped_fr)
 anaphoras_it, singletons_it = separate_anaphoras_and_singletons(dropped_ita)
+
+anaphoras_fr = add_school_level(anaphoras_fr)
+singletons_fr = add_school_level(singletons_fr)
+
+anaphoras_it = add_school_level(anaphoras_it)
+singletons_it = add_school_level(singletons_it)
+
 
 #TODO find a way to separate anaphoras from singletons
 def convert_and_count_categories(df, category_column, sheet_groups):
