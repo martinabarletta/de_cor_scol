@@ -76,8 +76,8 @@ project_dir = script_dir.parent
 
 
 # Load the Excel file
-file_path_fr = project_dir/"annotations_francais/typologie_mentions_fr_V4.xlsx"
-file_path_it = project_dir/"annotations_italien/ita_types_v2.xlsx"
+file_path_fr = project_dir/"sheets/francais/typologie_mentions_fr_V4.xlsx"
+file_path_it = project_dir/"sheets/italien/ita_types_v2.xlsx"
 
 
 
@@ -157,7 +157,7 @@ export_df = pd.concat(
 
 
 # 3. Esporta su Excel
-export_df.to_excel("./chains_profiles_fr.xlsx", index=False)
+export_df.to_excel(project_dir/"sheets/francais/chains_profiles_fr.xlsx", index=False)
 
 # Seleziona le prime 5 colonne Sheet_*
 sheet_columns = [col for col in export_df.columns if col.startswith('Sheet_')][0:3]

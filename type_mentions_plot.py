@@ -28,7 +28,6 @@ sheet_groups = {
     "sn_no_det" : "SN sans déterminant",
     "numerals" : "Autre",
     "autre" : 'Autre'
-
 }
 
 
@@ -70,22 +69,110 @@ def calculate_ERType(file_path, sheet_groups) :
     
     # Convert to DataFrame
     sheet_info_df = pd.DataFrame(sheet_info)
-    
-    # Display the DataFrame
-    print(sheet_info_df)
-    
-    # Convert to DataFrame
-    sheet_info_df = pd.DataFrame(sheet_info)
+
     
     # Now, group by 'Group' and sum the 'Row Count'
     grouped_df = sheet_info_df.groupby("Type")["Nb"].sum().reset_index()
     
     # Display the grouped DataFrame
-    print(grouped_df)
+    print(f" grouped df from file path {file_path}\n",grouped_df)
     return grouped_df, dfs
 
 
+def filter_anaphoras(dfs_dict, filtered_df):
+    # Define the columns used for matching
+    comparison_columns = ['begin', 'end', 'mention', 'tag', 'tag_occurrences', 'Source']
 
+    # Clean filtered_df
+    filtered_df_selected = filtered_df[comparison_columns].copy()
+
+    for col in comparison_columns:
+        if col in filtered_df_selected.columns:
+            if filtered_df_selected[col].dtype == "object":
+                filtered_df_selected[col] = filtered_df_selected[col].astype(str).str.strip()
+            else:
+                filtered_df_selected[col] = pd.to_numeric(filtered_df_selected[col], errors="coerce")
+
+    # Container for all removed rows
+    dropped_rows_list = []
+
+    # Process each dataframe
+    for key in dfs_dict:
+        df = dfs_dict[key]
+        existing_columns = [c for c in comparison_columns if c in df.columns]
+
+        # Clean types in the target dataframe
+        for col in existing_columns:
+            if df[col].dtype == "object":
+                df[col] = df[col].astype(str).str.strip()
+            else:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        # Merge to detect which rows will be dropped
+        merged = df.merge(
+            filtered_df_selected[existing_columns],
+            on=existing_columns,
+            how="left",
+            indicator=True
+        )
+
+        # Save the rows that will be removed
+        dropped_rows = merged[merged["_merge"] == "both"].drop(columns=["_merge"])
+        dropped_rows["origin"] = key  # keep track of origin
+        dropped_rows_list.append(dropped_rows)
+
+        # Keep only rows NOT matched
+        dfs_dict[key] = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"])
+
+    # Concatenate all removed rows in one dataframe (same format as originals)
+    if dropped_rows_list:
+        dropped_df = pd.concat(dropped_rows_list, ignore_index=True)
+    else:
+        dropped_df = pd.DataFrame(columns=comparison_columns + ["origin"])
+
+    return dfs_dict, dropped_df
+
+
+def separate_anaphoras_and_singletons(dropped_df):
+    """
+    Separate anaphoras and singletons from dropped_df based on:
+    - same Source
+    - same tag
+    - anaphora = exactly two rows: occurrences 1 and 2
+    - singleton = only one row with occurrences == 1
+    """
+
+    # group by Source and tag
+    grouped = dropped_df.groupby(['Source', 'tag'])
+
+    anaphoras = []
+    singletons = []
+
+    for (source, tag), group in grouped:
+        occurrences = list(group['tag_occurrences'])
+
+        # --- case 1: anaphora ---
+        # must have exactly two rows, and occurrences must be {1, 2}
+        if sorted(occurrences) == [1, 2] and len(group) == 2:
+            anaphoras.append(group)
+
+        # --- case 2: singleton ---
+        # must have only 1 row, and tag_occurrences == 1
+        elif len(group) == 1 and occurrences == [1]:
+            singletons.append(group)
+
+        # anything else is ignored (e.g. multiple anaphoras, malformed cases)
+
+    # concat results into single dataframes
+    anaphoras_df = pd.concat(anaphoras, ignore_index=True) if anaphoras else pd.DataFrame()
+    singletons_df = pd.concat(singletons, ignore_index=True) if singletons else pd.DataFrame()
+
+    return anaphoras_df, singletons_df
+
+
+#######################################
+#                MAIN                 #
+#######################################
 # Get this script's folder (codes/)
 script_dir = Path(__file__).parent
 # Go up one level to project/
@@ -93,55 +180,99 @@ project_dir = script_dir.parent
 
 
 # Load the Excel file
-file_path_fr = project_dir/"annotations_francais/typologie_mentions_fr_V4.xlsx"
-file_path_it = project_dir/"annotations_italien/ita_types_v2.xlsx"
+file_path_fr = project_dir/"sheets/francais/typologie_mentions_fr_V4.xlsx"
+file_path_it = project_dir/"sheets/italien/ita_types_v2.xlsx"
 
 #toutes mentions
 french, fr_dfs = calculate_ERType(file_path_fr, sheet_groups)
 italian, it_dfs = calculate_ERType(file_path_it, sheet_groups)
 
 #####filter out singletons and anaphoras##############################################################################
-filtered_df_fr = pd.read_csv(project_dir/"annotations_francais/anaphores_fr.csv") #<- fatto con interdistance_table
-filtered_df_it = pd.read_csv(project_dir/"annotations_italien/anaphores_it.csv") #<- fatto con interdistance_table
+filtered_df_fr = pd.read_csv(project_dir/"sheets/francais/anaphores_fr.csv") #<- fatto con interdistance_table
+filtered_df_it = pd.read_csv(project_dir/"sheets/italien/anaphores_it.csv") #<- fatto con interdistance_table
+
+filtered_fr, dropped_fr = filter_anaphoras(fr_dfs, filtered_df_fr)
+filtered_ita, dropped_ita = filter_anaphoras(it_dfs, filtered_df_it)
+
+anaphoras_fr, singletons_fr = separate_anaphoras_and_singletons(dropped_fr)
+anaphoras_it, singletons_it = separate_anaphoras_and_singletons(dropped_ita)
+
+#TODO find a way to separate anaphoras from singletons
+def convert_and_count_categories(df, category_column, sheet_groups):
+    """
+    Map categories in `category_column` using `sheet_groups`
+    and count how many rows fall into each mapped category.
+    """
+
+    # Convert to str to avoid type issues
+    df = df.copy()
+    df[category_column] = df[category_column].astype(str).str.strip()
+
+    # Map categories — unknown labels become 'Autre'
+    df['Category_mapped'] = df[category_column].map(sheet_groups).fillna('Autre')
+
+    # Count categories
+    counts = df['Category_mapped'].value_counts().reset_index()
+    counts.columns = ['Category', 'Count']
+
+    return df, counts
+
+singletons_fr, counts_sing_fr = convert_and_count_categories(singletons_fr, 'origin', sheet_groups)
+singletons_it, counts_sing_it = convert_and_count_categories(singletons_it, 'origin', sheet_groups)
 
 
-def filter_anaphoras(dfs_dict, filtered_df) : #dico de df, df anaphores
-    
-    # Define the columns to compare
-    comparison_columns = ['begin', 'end', 'mention', 'tag', 'tag_occurrences', 'Source']
-    
-    # Ensure filtered_df only contains relevant columns
-    filtered_df_selected = filtered_df[comparison_columns].copy()
-    
-    # Convert data types in filtered_df_selected
-    for col in comparison_columns:
-        if col in filtered_df_selected.columns:
-            if filtered_df_selected[col].dtype == 'object':
-                filtered_df_selected[col] = filtered_df_selected[col].astype(str).str.strip()
-            else:
-                filtered_df_selected[col] = pd.to_numeric(filtered_df_selected[col], errors='coerce')
-    
-    # Iterate over each DataFrame in the dictionary and drop matching rows
-    for key in dfs_dict:
-        existing_columns = [col for col in comparison_columns if col in dfs_dict[key].columns]
-        
-        # Convert data types in dfs_dict[key] to match filtered_df_selected
-        for col in existing_columns:
-            if dfs_dict[key][col].dtype == 'object':
-                dfs_dict[key][col] = dfs_dict[key][col].astype(str).str.strip()
-            else:
-                dfs_dict[key][col] = pd.to_numeric(dfs_dict[key][col], errors='coerce')
-    
-        # Merge and filter
-        dfs_dict[key] = dfs_dict[key].merge(filtered_df_selected[existing_columns], on=existing_columns, how='left', indicator=True)
-        dfs_dict[key] = dfs_dict[key][dfs_dict[key]['_merge'] == 'left_only'].drop(columns=['_merge'])
-    
-    return dfs_dict
+def convert_and_count_categories_anaphore(df, category_column, sheet_groups):
+    """
+    Map categories in `category_column` using `sheet_groups`
+    and produce:
+    - total counts per category
+    - counts for tag_occurrences == 1
+    - counts for tag_occurrences == 2
+    """
+
+    df = df.copy()
+
+    # Ensure the category column is clean
+    df[category_column] = df[category_column].astype(str).str.strip()
+
+    # Apply mapping
+    df['Category_mapped'] = df[category_column].map(sheet_groups).fillna('Autre')
+
+    # ---- TOTAL counts ----
+    counts_total = (
+        df['Category_mapped']
+        .value_counts()
+        .reset_index()
+        .rename(columns={'index': 'Category', 'Category_mapped': 'Count'})
+    )
+
+    # ---- Counts for tag_occurrences == 1 ----
+    df_occ1 = df[df['tag_occurrences'] == 1]
+    counts_occ1 = (
+        df_occ1['Category_mapped']
+        .value_counts()
+        .reset_index()
+        .rename(columns={'index': 'Category', 'Category_mapped': 'Count'})
+    )
+
+    # ---- Counts for tag_occurrences == 2 ----
+    df_occ2 = df[df['tag_occurrences'] == 2]
+    counts_occ2 = (
+        df_occ2['Category_mapped']
+        .value_counts()
+        .reset_index()
+        .rename(columns={'index': 'Category', 'Category_mapped': 'Count'})
+    )
+
+    return df, counts_total, counts_occ1, counts_occ2
+
+anaphore_fr, counts_total_anaf_fr, counts_occ1, counts_occ2 = convert_and_count_categories_anaphore(anaphoras_fr, 'origin', sheet_groups)
+tot_counts_occ1 = counts_occ1['Count'].sum()
+tot_counts_occ2 = counts_occ2['Count'].sum()
 
 
-######
-filtered_fr = filter_anaphoras(fr_dfs, filtered_df_fr)
-filtered_ita = filter_anaphoras(it_dfs, filtered_df_it)
+anaphore_it, counts_total_anaf_it, counts_occ1_it, counts_occ2_it = convert_and_count_categories_anaphore(anaphoras_it, 'origin', sheet_groups)
+
 
 # Define the new function to work with a dictionary of DataFrames
 def calculate_ERType_from_dict(dfs_dict, sheet_groups, mention_order = None):
@@ -161,7 +292,7 @@ def calculate_ERType_from_dict(dfs_dict, sheet_groups, mention_order = None):
         if mention_order is not None and 'tag_occurrences' in df_cleaned.columns:
             df_cleaned = df_cleaned[df_cleaned['tag_occurrences'] == mention_order]
             
-                # Count rows excluding the header
+        # Count rows excluding the header
         row_count = len(df_cleaned)
         
         # Determine the group (default to "Uncategorized" if not found in mapping)
@@ -172,9 +303,6 @@ def calculate_ERType_from_dict(dfs_dict, sheet_groups, mention_order = None):
     
     # Convert the sheet_info list to a DataFrame
     sheet_info_df = pd.DataFrame(sheet_info)
-    
-    # Display the DataFrame
-    print(sheet_info_df)
     
     # Now, group by 'Type' (group name) and sum the 'Nb' (row count)
     grouped_df = sheet_info_df.groupby("Type")["Nb"].sum().reset_index()
@@ -197,6 +325,9 @@ italian_1 = calculate_ERType_from_dict(filtered_ita, sheet_groups, 1)
 french_2 = calculate_ERType_from_dict(filtered_fr, sheet_groups, 2)
 italian_2 = calculate_ERType_from_dict(filtered_ita, sheet_groups, 2)
 
+
+#######################################
+#                PLOTS                #
 #######################################
 def plot_barres(french, italian):
     #plot similarities and differences between the two languages in terms of distribution : percentage representation
@@ -222,7 +353,8 @@ def plot_barres(french, italian):
     pastel_colors = pastel_colors[3:5]
     
     #fixed categories for x axis label order
-    categories = ["Pronom", "SN défini", "SN indéfini","SN possessif", "SN démonstratif", "SN sans déterminant",
+    categories = ["Pronom", "SN défini", "SN indéfini",
+                  "SN possessif", "SN démonstratif", "SN sans déterminant",
                   "Nom Propre", "Anaphore Zéro", "Autre"]
     
     
@@ -275,8 +407,15 @@ def plot_barres(french, italian):
     plt.show()
     
     #############filter out types in chain start and types in chain 2nd position
-    
+
+#solo CATENE
 plot1 = plot_barres(french, italian)
+
+##check french content
+print("\nsum french : ",french['Nb'].sum())
+
+#plot su anaforici, distribuzione per posizione uno e due ?
+
 plot2 = plot_barres(french_1, italian_1)
 plot3 = plot_barres(french_2, italian_2)    
     
@@ -300,8 +439,9 @@ def plot_barres_horizontal(french, italian, name):
 
     df_plot = merged_df[merged_df['Type'] != 'Total']
     df_plot['Type'] = pd.Categorical(df_plot['Type'], categories=categories, ordered=True)
-    df_plot = df_plot.sort_values('Type', ascending=True)[::-1]
-
+    
+    
+    df_plot = df_plot.sort_values('% fr', ascending=True)
 
     # Création du graphique en barres horizontales
     ax = df_plot.plot(x='Type', y=['% fr', '% it'], kind='barh', figsize=(12, 8),
@@ -311,24 +451,29 @@ def plot_barres_horizontal(french, italian, name):
 
     # Ajouter les étiquettes de pourcentage à droite des barres
     for i in range(len(df_plot)):
-        ax.text(df_plot['% fr'].iloc[i] + 0.5, i - 0.2, f"{df_plot['% fr'].iloc[i]:.2f}", va='center', fontsize=14)
         ax.text(df_plot['% it'].iloc[i] + 0.5, i + 0.2, f"{df_plot['% it'].iloc[i]:.2f}", va='center', fontsize=14)
+        ax.text(df_plot['% fr'].iloc[i] + 0.5, i - 0.2, f"{df_plot['% fr'].iloc[i]:.2f}", va='center', fontsize=14)
 
-    plt.xlabel('Pourcentage', fontsize=14)
+    plt.xlabel('Pourcentage', fontsize=16)
     plt.ylabel('')
-    plt.legend(fontsize=14, loc='lower right')
-    plt.xticks(fontsize=14)
-    plt.yticks(fontsize=14)
+    plt.legend(fontsize=16, loc='lower right')
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
 
     max_value = df_plot[['% fr', '% it']].max().max()
-    plt.xlim(0, max_value + 2)
+    plt.xlim(0, max_value + 5)
 
     plt.tight_layout()
     plt.savefig(name, dpi=1200, bbox_inches='tight')
     plt.show()
 
-
+#toutes mentions confondues 
 plot_barres_horizontal(french, italian, project_dir/"plots/typologie_français_italien_horizontal.png")
+
+
+
+
+
 plot_barres_horizontal(french_1, italian_1, project_dir/"plots/typologie_français_italien_CE1.png")
 plot_barres_horizontal(french_2, italian_2, project_dir/"plots/typologie_français_italien_CE2.png")
 
@@ -360,7 +505,7 @@ def build_position_type_matrix(dfs_dict, sheet_groups, max_position=5):
 # --- Funzione modificata per plottare la heatmap su un asse specifico ---
 def plot_heatmap(matrix_df, ax, language='Français'):
     sns.heatmap(matrix_df, annot=True, fmt="d", cmap="YlGnBu", linewidths=0.5, cbar=False, ax=ax,
-               annot_kws={"size": 18})
+               annot_kws={"size": 20})
     ax.set_title(f"Distribution des types de mentions par position ({language})", fontsize=22)
     ax.set_ylabel("Position dans la chaîne", fontsize=24)
 
@@ -377,5 +522,8 @@ fig, axes = plt.subplots(1, 2, figsize=(20, 8))
 plot_heatmap(matrix_fr, axes[0], language='Français')
 plot_heatmap(matrix_it, axes[1], language='Italien')
 
+plt.savefig(project_dir/"plots/heatmap.png")
+ 
+    
 plt.tight_layout()
 plt.show()
