@@ -93,16 +93,16 @@ project_dir = script_dir.parent
 
 
 # Load the Excel file
-file_path_fr = project_dir/"annotations_francais/typologie_mentions_fr_V4.xlsx"
-file_path_it = project_dir/"annotations_italien/ita_types_v2.xlsx"
+file_path_fr = project_dir/"sheets/francais/typologie_mentions_fr_V4.xlsx"
+file_path_it = project_dir/"sheets/italien/ita_types_v2.xlsx"
 
 #toutes mentions
 french, fr_dfs = calculate_ERType(file_path_fr, sheet_groups)
 italian, it_dfs = calculate_ERType(file_path_it, sheet_groups)
 
 #####filter out singletons and anaphoras##############################################################################
-filtered_df_fr = pd.read_csv(project_dir/"annotations_francais/anaphores_fr.csv") #<- fatto con interdistance_table
-filtered_df_it = pd.read_csv(project_dir/"annotations_italien/anaphores_it.csv") #<- fatto con interdistance_table
+filtered_df_fr = pd.read_csv(project_dir/"sheets/francais/anaphores_fr.csv") #<- fatto con interdistance_table
+filtered_df_it = pd.read_csv(project_dir/"sheets/italien/anaphores_it.csv") #<- fatto con interdistance_table
 
 
 def filter_anaphoras(dfs_dict, filtered_df) : #dico de df, df anaphores
